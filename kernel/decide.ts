@@ -13,6 +13,7 @@ import {
   jobOf,
   openInScope,
   pauseOf,
+  routingOf,
   sourceOf,
   waitingOn,
   workerOf,
@@ -216,9 +217,7 @@ function ingest(draft: Draft, source: string, given: unknown) {
   const event = parseEvent(given);
   const existing = rows(draft.view, "events", { source, key: event.id })[0];
   if (existing) {
-    const skipped: string[] = JSON.parse(existing.paused ?? "[]");
-    const taken = JSON.parse(existing.routed).filter((name: string) => !skipped.includes(name));
-    return { event: existing.id, duplicate: true, routed: taken, paused: skipped };
+    return { event: existing.id, duplicate: true, ...routingOf(existing) };
   }
   const tooDeep = event.hops > MAX_HOPS;
   const takes = (rule: Rule) =>
@@ -422,11 +421,16 @@ function applyReceipt(draft: Draft, run: Row, result: Result) {
     notify(draft, `run:${id}:done`, run.rule, summary, once);
   }
   for (const later of result.later ?? []) scheduleReview(draft, run, later);
+  const emitted: number[] = [];
   for (const event of result.events ?? []) {
     if (rule?.emits && typeMatches(rule.emits.types, event.type)) {
-      ingest(draft, rule.emits.source, { ...event, hops: hopsOf(draft, run) + 1 });
+      const sent = ingest(draft, rule.emits.source, { ...event, hops: hopsOf(draft, run) + 1 });
+      // A number already taken is an earlier event's, perhaps another source's: what it says isn't what this receipt sent.
+      if (!sent.duplicate) emitted.push(sent.event);
     } else rejected.push({ what: "events", reason: `规则「${run.rule}」没有写可以发 ${event.type}` });
   }
+  // The source whose event this run took reads them back (`eventOutcome`); nothing else links them to the run.
+  if (emitted.length) put(draft, "runs", id, { emitted: JSON.stringify(emitted) });
   return rejected;
 }
 
