@@ -121,7 +121,7 @@ Codex 的三个档位已用插件命令实跑；DeepSeek Harness 和 Claude Code
 
 ACP 的 `access` 只管 Agent 主动来问的操作。规范允许 Agent 不询问就执行，这种操作 `access` 拦不住，要用 Agent 自己的模式限制，比如 `command` 里写 `env INITIAL_AGENT_MODE=read-only …`。ACP 的 `model`、`effort` 不生效，也要在 Agent 自己那边设置。
 
-场景模板据此选权限：早报用 `edit` 写本地文件，issue 用 `edit` 改代码并让固定脚本联网取正文，告警用 `read` 看代码和事件附带的调用栈。反馈处理和飞书摘要用 `edit`，网站排查用 `read`；固定巡检与飞书读取脚本负责联网，摘要 Agent 只读完整快照。`command` 和固定脚本以本机账号运行，不受 `access` 约束。
+场景模板据此选权限：早报用 `edit` 写本地文件，issue 用 `edit` 改代码并让固定脚本联网取正文，告警用 `read` 看代码和事件附带的调用栈。反馈处理、飞书摘要和邮件分诊用 `edit`，网站排查用 `read`；固定巡检、飞书读取和邮箱读取脚本负责联网，摘要与分诊 Agent 只读完整快照。`command` 和固定脚本以本机账号运行，不受 `access` 约束。
 
 ## 一致性测试
 
