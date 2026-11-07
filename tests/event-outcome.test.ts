@@ -3,7 +3,8 @@
 // source can tell which numbers are taken; a run waiting to try again reads as finished, or one that won't be tried again,
 // was stopped by the owner, or lost its rule has no end to read; a run that also took another source's event hands over
 // its summary or the events its receipt sent; another run's events show up as this one's; the number a resend got back
-// as a duplicate finds nothing.
+// as a duplicate finds nothing; an event the hub recorded under a source without that source sending it (what a receipt
+// sent on its behalf, the owner's manual run) is read with that source's key.
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -94,6 +95,18 @@ test("from waiting, through a try that didn't get through, to done with the rece
   assert.deepEqual(done.events, [
     { id: "n:1", type: "note.made", subject: "#1", summary: "写好了", detail: "报告", link: "" },
   ]);
+});
+
+test("what the hub recorded under a source, without that source sending it, isn't the source's to read", async () => {
+  const { event } = send("app", "f:sent");
+  const job = take();
+  hub.finish(job.run, job.token, { outcome: "done", summary: "写好了", events: [{ id: "n:made", type: "note.made" }] });
+  const [made] = (await outcome(event)).json.runs[0].events;
+  // Sending the same number again gets back the one the receipt made.
+  const madeEvent = hub.ingest("ops", { id: made.id, type: "note.made" }).event;
+  assert.equal((await outcome(madeEvent, keys.ops)).status, 404, "a receipt's event reads as the source's own");
+  const manual = hub.execute("runRule", ["意见", "owner", { subject: "#9", reason: "看看" }]) as { event: number };
+  assert.equal((await outcome(manual.event)).status, 404, "the owner's manual run reads as the source's own");
 });
 
 test("each run shows only what its own receipt sent", async () => {

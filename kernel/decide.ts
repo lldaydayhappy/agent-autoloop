@@ -192,7 +192,14 @@ function enqueue(draft: Draft, rule: Rule, event: number, lane: string, resume?:
 }
 
 /** Keeps an event under a key of its own: one the hub makes up mustn't collide with one a source sent. */
-function recordEvent(draft: Draft, source: string, event: Row, routed: string[], paused: string[] = []): number {
+function recordEvent(
+  draft: Draft,
+  source: string,
+  event: Row,
+  routed: string[],
+  paused: string[] = [],
+  sent = false,
+): number {
   let key = event.id;
   for (let suffix = 1; rows(draft.view, "events", { source, key }).length; suffix++) {
     key = `${event.id}:${suffix}`;
@@ -209,11 +216,13 @@ function recordEvent(draft: Draft, source: string, event: Row, routed: string[],
     routed: JSON.stringify(routed),
     // Only where a pause held it back, so the owner's list of what was skipped reads an index of those alone.
     ...(paused.length && { paused: JSON.stringify(paused) }),
+    // Through the source's own door: only these are its to read back (`eventOutcome`), not what the hub made in its name.
+    ...(sent && { sent: 1 }),
     received_at: draft.at,
   }).id;
 }
 
-function ingest(draft: Draft, source: string, given: unknown) {
+function ingest(draft: Draft, source: string, given: unknown, sent = false) {
   const event = parseEvent(given);
   const existing = rows(draft.view, "events", { source, key: event.id })[0];
   if (existing) {
@@ -233,6 +242,7 @@ function ingest(draft: Draft, source: string, given: unknown) {
     event,
     matched.map((rule) => rule.name),
     paused,
+    sent,
   );
   if (tooDeep) {
     const words = `同一条处理链已超过 ${MAX_HOPS} 层，后续事件已记录，没有继续派发。`;
@@ -664,7 +674,7 @@ const HANDLERS: Record<string, (draft: Draft, ...args: any[]) => unknown> = {
     set(draft, "keys", `${kind}:${name}`, null);
     return true;
   },
-  ingest,
+  ingest: (draft, source, given) => ingest(draft, source, given, true),
   createCard,
   /** A task elsewhere asks you; your answer goes on like a round of a rule, where its cwd says. */
   ask(draft, name, given) {

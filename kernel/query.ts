@@ -54,7 +54,7 @@ export function routingOf(event: Row) {
  */
 export function eventOutcome(view: View, source: string, id: number) {
   const event = view.get("events", id);
-  if (event?.source !== source) return null;
+  if (event?.source !== source || !event.sent) return null;
   const runs = rows(view, "run_events", { event_id: id })
     .map((link) => view.get("runs", link.run_id)!)
     .sort((a, b) => a.id - b.id);
