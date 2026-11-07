@@ -26,14 +26,14 @@ node --disable-warning=ExperimentalWarning --test --test-name-pattern='agent-aut
 
 从 [hello-agent/agent.ts](../examples/plugins/hello-agent/agent.ts) 开始。它用 `printf` 代替模型，克隆到别处也能运行。收下提示词和结束时各打一行，`read` 从第一行就知道这一轮接上了原会话，第二行是它的最后一条消息。
 
-| 导出对象的方法               | 作用                                                                                                     |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `command(turn)`              | 返回命令参数数组；参数不作为 shell 代码执行                                                              |
-| `read(stdout, code, stderr)` | 返回 `text`、`session`、`usage`、`sessionUsage`、`error`、`finished`、`started`；运行中 `code` 为 `null` |
-| `link(session)`              | 可选，打开这个会话的链接。回执写错时，`read` 返回了 `session` 的插件都只重写回执，和有没有链接无关       |
-| `check()`                    | 可选，能用返回 `null`，否则返回下一步怎么做                                                              |
+| 导出对象的方法               | 作用                                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `command(turn)`              | 返回命令参数数组；参数不作为 shell 代码执行                                                                                   |
+| `read(stdout, code, stderr)` | 返回 `text`、`session`、`usage`、`sessionUsage`、`error`、`finished`、`started`；运行中 `code` 为 `null`                      |
+| `link(session)`              | 可选，打开这个会话的链接。回执写错时，`read` 返回了 `session` 的插件都只重写回执，和有没有链接无关                            |
+| `check(program)`             | 可选，`doctor` 问它这个 Agent 现在能不能用：能用返回 `null`，否则返回下一步怎么做。参数是规则里给它写的 `program`，没写就不传 |
 
-`turn` 包含 `prompt`、`session`、`resume`、`cwd`、`access`、`model`、`effort`、`command`、`contextFile`、`folder`。`contextFile` 是资料文件，受限 CLI 需要允许读取 `folder`。`read` 要能处理未写完的输出；CLI 真正完成后才返回 `text`。`read` 抛错或什么也不返回时，还在跑的接着跑，结束后这一轮算没跑成，留在原会话重派。
+`turn` 包含 `prompt`、`session`、`resume`、`cwd`、`access`、`model`、`effort`、`command`、`program`、`contextFile`、`folder`。`contextFile` 是资料文件，受限 CLI 需要允许读取 `folder`。`program` 只在规则里写了才出现，是内置插件要换成的那一个启动程序；第三方插件用不上，收下也可以不理。`read` 要能处理未写完的输出；CLI 真正完成后才返回 `text`。`read` 抛错或什么也不返回时，还在跑的接着跑，结束后这一轮算没跑成，留在原会话重派。
 
 支持 `resume` 的插件，从 Agent 收下提示词起都要返回 `started: true`，包括运行中和出错之后。否则干到一半断了，也会被当成会话接不上，开新会话把业务重做一遍。返回了 `session` 就要按 `turn.resume` 接回原会话：没跑成的重派和写错回执的重写都靠它；接不回去的 CLI 不要返回 `session`。
 

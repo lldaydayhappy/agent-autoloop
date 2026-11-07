@@ -9,7 +9,7 @@ description: 配置 Agent 自动化中台：加规则、接新的事件插件、
 
 ## 看情况、回答
 
-`agent-autoloop status` 列出谁在线、等用户什么、在做什么、做过什么，还有按完成时间统计的今天和最近 7 天的轮数、Token 和费用（同一轮重试的已报用量相加，没上报的轮数会写出来）。`agent-autoloop status --json` 输出 `/v1/state` 的原样结构，给脚本和看板用。`agent-autoloop answer <卡片> <序号>` 回答，`agent-autoloop resolve <卡片> <结果>` 结案，`agent-autoloop stop <第几轮>` 停掉一轮，等整个进程组退出才报告已停。
+`agent-autoloop status` 列出谁在线、等用户什么、在做什么、做过什么，还有按完成时间统计的今天和最近 7 天的轮数、Token 和费用（同一轮重试的已报用量相加，没上报的轮数会写出来）。终端里它带颜色，接管道、被 Agent 调用或设了 `NO_COLOR` 时是纯文本。`agent-autoloop status --json` 输出 `/v1/state` 的原样结构，给脚本和看板用。`agent-autoloop answer <卡片> <序号>` 回答，`agent-autoloop resolve <卡片> <结果>` 结案，`agent-autoloop stop <第几轮>` 停掉一轮，等整个进程组退出才报告已停。
 
 续接会话也只算这次新增的用量。`~/.agent-autoloop/worker/usage/` 存着相减要用的累计值，没有记录的续接（比如删了这个目录）这次不报 Codex 的 Token 和 Claude Code 的费用，下一次恢复正常。本人打开链接在同一个会话里接着聊用掉的量，会算进下一次续接。旧回执不重算。
 
@@ -199,7 +199,7 @@ MCP 服务不区分调用方，都按本人记录（`answer` 记成本人，`emi
 
 ## 日志与恢复
 
-Windows 用任务计划程序在本人登录后启动；通过 SSH 管理时仍用这个登录任务运行 Codex，避免它在 OpenSSH 会话中的沙箱启动限制（见 `INSTALL.md`）；`service install`、`service remove`、`update` 同样适用，更新会重启中台。安装见 `INSTALL.md`。
+Windows 用任务计划程序在本人登录后启动；通过 SSH 管理时仍用这个登录任务运行 Codex，避免它在 OpenSSH 会话中的沙箱启动限制（见 `INSTALL.md`）；`service install`、`service remove`、`update` 同样适用，更新会重启中台。Windows 自带的 Administrator 账号用「启动」文件夹代替登录任务，`service install` 会打印做法。安装见 `INSTALL.md`。
 
 日志：Windows 在 `%USERPROFILE%\.agent-autoloop\logs\up.log`，macOS 在 `~/.agent-autoloop/logs/up.log`，Linux 运行 `journalctl --user -u agent-autoloop`。
 
