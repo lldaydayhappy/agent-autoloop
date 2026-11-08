@@ -49,7 +49,7 @@ node --disable-warning=ExperimentalWarning --test --test-name-pattern='agent-aut
 
 Codex 的 Windows elevated 沙箱使用专用账号；插件给该账号组增加本轮 `context.json` 的读权限，不更改账号或沙箱模式。Codex 自己也会给用户目录下的文件夹（含数据目录）加这个账号组的读权限，见 [SECURITY](../SECURITY.md)。
 
-Windows 原生运行支持 `.exe`/`.com`、PowerShell `.ps1` 和 npm 生成的 JavaScript `.cmd` 包装（直接执行其 JS 入口，保留中文、多行及引号）。其他 `.bat`/`.cmd` 不作为 shell 源码启动，请用可执行程序或 `node script.js`。Unix 沿用登录 shell 查找命令，Windows 按 PATH 和 PATHEXT 找；Agent 自己也必须支持当前系统。文中的 shell、curl/jq 教程在 Unix 或 WSL 运行。
+Windows 原生运行支持 `.exe`/`.com`、PowerShell `.ps1` 和 npm 生成的 `.cmd` 包装（直接执行其 JS 入口或 `.exe`，保留中文、多行及引号）。其他 `.bat`/`.cmd` 不作为 shell 源码启动，请用可执行程序或 `node script.js`。Unix 沿用登录 shell 查找命令，Windows 按 PATH 和 PATHEXT 找；Agent 自己也必须支持当前系统。文中的 shell、curl/jq 教程在 Unix 或 WSL 运行。
 
 只需要打印最后一条消息时，用内置 `command` 加参数数组即可，不必写插件。参数里可以用 `{prompt}`、`{model}`、`{effort}`、`{cwd}`、`{context}`，每个参数只替换一轮，替换进去的提示词原样传给程序：提示词里写着 `{cwd}` 或 `$&`，到程序那边也还是这几个字，不会被再替换一次。每个 Agent 进程（包括内置插件配的 `program` 脚本）都能读到环境变量 `AGENT_AUTOLOOP_CONTEXT`（资料文件）和 `AGENT_AUTOLOOP_RUN`（第几轮）。同一轮重试、重写回执时编号不变；回答和到期的复查是新的一轮，编号不同。
 
