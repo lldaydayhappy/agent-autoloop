@@ -178,7 +178,7 @@ OpenClaw's `agent exec` stops each run after 600 seconds by default, and that co
 
 Agents that speak ACP connect with `use: "acp"` and can go on in the same session: [Gemini CLI](https://geminicli.com/docs/cli/acp-mode/) is `"command": ["gemini", "--acp"]`, and [OpenCode](https://opencode.ai/docs/acp) is `"command": ["opencode", "acp"]`. Both answered the ACP handshake (Gemini CLI 0.67.0, OpenCode 1.1.2); multi-turn Q&A and session resumption have not been run yet.
 
-**Delivery pipeline.** Add the `deliver` label to a GitHub PR and it follows through to release: **review → wait for CI → merge → wait for deploy → verify the live version**. Settings are read only from `main`, and PR code is never checked out or run on the worker machine. Queueing, concurrency, and retries come from the kernel.
+**Delivery pipeline.** Add the `deliver` label to a GitHub PR and it follows through to release: **review → wait for CI → merge → wait for deploy → verify the live version**. The reviewer can be set per authoring agent: a Codex model and reasoning effort, another command, or no review. Settings are read only from `main`, and PR code is never checked out or run on the worker machine. Queueing, concurrency, and retries come from the kernel.
 
 **Write your own.** Start from the runnable [agent](examples/plugins/hello-agent/agent.ts), [channel](examples/plugins/hello-channel/channel.ts), and [event](examples/plugins/hello-source/source.ts) templates and the [plugin guide](docs/plugins.md). For web tasks, read [browser access](docs/plugins.md#浏览器接入) first. The CLI and [MCP](skills/agent-autoloop/SKILL.md#mcp-与密钥撤销) can also inspect and answer cards.
 

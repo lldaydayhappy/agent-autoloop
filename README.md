@@ -176,7 +176,7 @@ OpenClaw 的 `agent exec` 每次默认最多跑 600 秒，到点就算失败；�
 
 会说 ACP 的 Agent 用 `use: "acp"` 接，还能接着原来的会话做：[Gemini CLI](https://geminicli.com/docs/cli/acp-mode/) 写 `"command": ["gemini", "--acp"]`，[OpenCode](https://opencode.ai/docs/acp) 写 `"command": ["opencode", "acp"]`。这两条已经跑通了 ACP 握手（Gemini CLI 0.67.0、OpenCode 1.1.2），多轮问答和会话续接还没跑过。
 
-**交付流水线。** 给 GitHub PR 打上 `deliver` 标签后，它会自己跟进到上线：**审代码 → 等 CI → 合并 PR → 等部署 → 核对线上版本**。审查和交付配置只从 `main` 读取，绝不在接单电脑上检出或运行 PR 里的代码；排队、并发和重试直接复用内核。
+**交付流水线。** 给 GitHub PR 打上 `deliver` 标签后，它会自己跟进到上线：**审代码 → 等 CI → 合并 PR → 等部署 → 核对线上版本**。审查器可以按写代码的 Agent 分开配：指定 Codex 的模型和推理深度、换成别的命令，或者免审。审查和交付配置只从 `main` 读取，绝不在接单电脑上检出或运行 PR 里的代码；排队、并发和重试直接复用内核。
 
 **写自己的插件。** 从 [Agent](examples/plugins/hello-agent/agent.ts)、[通道](examples/plugins/hello-channel/channel.ts)、[事件](examples/plugins/hello-source/source.ts) 三个可运行的最小模板开始，见[插件开发说明](docs/plugins.md)。要让 Agent 操作网页，先看[浏览器接入](docs/plugins.md#浏览器接入)。命令行和 [MCP](skills/agent-autoloop/SKILL.md#mcp-与密钥撤销) 也能查看和回答卡片。
 
