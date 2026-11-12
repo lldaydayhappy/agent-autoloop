@@ -36,9 +36,17 @@ const ONLINE = 120_000 + SEEN_EVERY;
 const PAGE = 60;
 const WEEK = 7 * 86400_000;
 
-export type Spending = { rounds: number; tokens: number; cost: number; missingTokens: number; missingCost: number };
+export type Spending = {
+  rounds: number;
+  tokens: number;
+  cached: number;
+  cost: number;
+  missingTokens: number;
+  missingCost: number;
+};
 const SPENDING = `SELECT COUNT(*) AS rounds,
   COALESCE(SUM(COALESCE(json_extract(usage, '$.input'), 0) + COALESCE(json_extract(usage, '$.output'), 0)), 0) AS tokens,
+  COALESCE(SUM(json_extract(usage, '$.cached')), 0) AS cached,
   COALESCE(SUM(json_extract(usage, '$.cost')), 0) AS cost,
   COUNT(*) - COUNT(COALESCE(json_extract(usage, '$.input'), json_extract(usage, '$.output'))) AS missingTokens,
   COUNT(*) - COUNT(json_extract(usage, '$.cost')) AS missingCost

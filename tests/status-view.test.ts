@@ -29,8 +29,8 @@ const state = {
   now,
   timezone: "Asia/Shanghai",
   spending: {
-    today: { rounds: 0, tokens: 0, cost: 0, missingTokens: 0, missingCost: 0 },
-    week: { rounds: 0, tokens: 0, cost: 0, missingTokens: 0, missingCost: 0 },
+    today: { rounds: 0, tokens: 0, cached: 0, cost: 0, missingTokens: 0, missingCost: 0 },
+    week: { rounds: 0, tokens: 0, cached: 0, cost: 0, missingTokens: 0, missingCost: 0 },
   },
   totals: { running: 1, queued: 0, retrying: 0, unknown: 0, doneToday: 1 },
   agents: [{ name: "Claude", worker: "m4", online: false, seenAt: "2026-11-06T13:00:00.000Z" }],
