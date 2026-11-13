@@ -5,7 +5,8 @@
 // the card stays after it's fixed; a rules file that is gone stops the hub, or isn't picked up when it's moved back, or
 // brings back a card the owner closed at every tick.
 // Cancelling a timer that isn't waiting spoils the receipt it's in; a timer coming due after its rule has gone stops the
-// clock for everything else, or starts something; a clock set back runs the same scheduled moment a second time.
+// clock for everything else, starts something, or goes by without telling the owner; a clock set back runs the same
+// scheduled moment a second time.
 import assert from "node:assert/strict";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -175,7 +176,7 @@ test("cancelling a look-again that isn't waiting changes nothing, and the rest o
   );
 });
 
-test("a look-again coming due after its rule has gone is kept on record, starts nothing and doesn't stop the clock", () => {
+test("a look-again coming due after its rule has gone is kept on record, starts nothing, tells the owner and doesn't stop the clock", () => {
   clean();
   ingest("app", { id: "1", type: "feedback.new", subject: "#1" }, at(0));
   const job = claim("w1", at(0))!;
@@ -191,6 +192,11 @@ test("a look-again coming due after its rule has gone is kept on record, starts 
     assert.deepEqual(JSON.parse(event.routed), []);
     assert.deepEqual(all("SELECT id FROM timers WHERE event_id IS NULL"), [], "it doesn't come due again");
     assert.deepEqual(all("SELECT id FROM runs WHERE rule = '意见' AND state = 'queued'"), []);
+    const told = all<{ title: string; text: string }>("SELECT title, text FROM cards WHERE state = 'open'");
+    assert.equal(told.length, 1);
+    assert.equal(told[0].title, "意见");
+    assert.match(told[0].text, /规则「意见」不在了/);
+    assert.match(told[0].text, /看原站恢复了没有/);
   } finally {
     writeFileSync(rulesFile, before);
     reloadRules();

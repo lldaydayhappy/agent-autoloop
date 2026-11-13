@@ -343,10 +343,15 @@ function stopRun(draft: Draft, run: Row, why: string, summary: string, words: st
   notify(draft, `run:${run.id}:${why}`, run.rule, words, threadOf(run));
 }
 
-const ruleGone = (run: Row): [string, string] => [
-  `规则「${run.rule}」不在了，不再派发`,
-  `规则「${run.rule}」不在了（删掉或改名了），排着的这一轮不再派发。还要做的话重新触发这件事。`,
+const ruleGone = (rule: string, what = "排着的这一轮"): [string, string] => [
+  `规则「${rule}」不在了，不再派发`,
+  `规则「${rule}」不在了（删掉或改名了），${what}不再派发。还要做的话重新触发这件事。`,
 ];
+/** Enough of what a look-again was for to know it again: it can run to thousands of characters. */
+function opening(about: string) {
+  const chars = [...about.replace(/\s+/g, " ").trim()];
+  return chars.length > 60 ? `${chars.slice(0, 60).join("")}…` : chars.join("");
+}
 
 /** A run that didn't get through waits to try again, and takes along whatever came in for the same thing meanwhile. */
 function retryLater(draft: Draft, run: Row, result: Result) {
@@ -363,7 +368,7 @@ function retryLater(draft: Draft, run: Row, result: Result) {
   const failure = { attempts, error, ...unclaimed };
   if (!ruleNamed(draft, run.rule)) {
     put(draft, "runs", id, failure);
-    stopRun(draft, run, "rule-gone", ...ruleGone(run));
+    stopRun(draft, run, "rule-gone", ...ruleGone(run.rule));
     return rejected;
   }
   if (attempts >= MAX_ATTEMPTS) {
@@ -582,6 +587,10 @@ function tick(draft: Draft) {
     const eventId = recordEvent(draft, timer.source, event, rule ? [rule.name] : []);
     put(draft, "timers", timer.id, { event_id: eventId });
     if (rule) enqueue(draft, rule, eventId, timer.lane, timer.agent === rule.to ? timer.session : null);
+    else {
+      const [, words] = ruleGone(timer.rule, `到期的复查「${opening(timer.about)}」`);
+      notify(draft, `timer:${timer.id}:rule-gone`, timer.rule, words, { rule: timer.rule, lane: timer.lane });
+    }
   }
   sweep(draft);
 }
@@ -694,7 +703,7 @@ const HANDLERS: Record<string, (draft: Draft, ...args: any[]) => unknown> = {
     put(draft, "config", "rules", { value: rules, version: draft.seq });
     for (const run of rows(draft.view, "runs", { state: "queued" })) {
       if (ruleOf(rules, run.rule)) assignQueued(draft, run);
-      else stopRun(draft, run, "rule-gone", ...ruleGone(run));
+      else stopRun(draft, run, "rule-gone", ...ruleGone(run.rule));
     }
     closeOpen(draft, (key) => key.startsWith("rules:"), "改好了");
   },
