@@ -176,7 +176,7 @@ Built-in plugins ship with the program and are enabled through configuration. Us
 
 OpenClaw's `agent exec` stops each run after 600 seconds by default, and that counts as a failure; for longer work add `--timeout <seconds>` to the command (`0` means no limit).
 
-Agents that speak ACP connect with `use: "acp"` and can go on in the same session: [Gemini CLI](https://geminicli.com/docs/cli/acp-mode/) is `"command": ["gemini", "--acp"]`, and [OpenCode](https://opencode.ai/docs/acp) is `"command": ["opencode", "acp"]`. Both answered the ACP handshake (Gemini CLI 0.67.0, OpenCode 1.1.2); multi-turn Q&A and session resumption have not been run yet.
+Agents that speak ACP connect with `use: "acp"` and can go on in the same session: [Gemini CLI](https://geminicli.com/docs/cli/acp-mode/) is `"command": ["gemini", "--acp"]`, [OpenCode](https://opencode.ai/docs/acp) is `"command": ["opencode", "acp"]`, and Antigravity is `"command": ["agy", "acp"]`. Gemini CLI 0.67.0 and OpenCode 1.1.2 answered the ACP handshake; multi-turn Q&A and session resumption have not been run yet. Antigravity (agy 1.5.5) has run both on Windows.
 
 **Delivery pipeline.** Once delivery rules are configured, the `deliver` label takes a GitHub PR through review, CI, merge, deployment, and live-version verification. Projects can choose reviewers per authoring agent or share a policy. Delivery reads trusted settings from main and reviews a read-only snapshot on the worker.
 
