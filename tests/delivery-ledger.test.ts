@@ -1,6 +1,7 @@
 // Failure modes: a shared plan drops a repeated reviewer, a policy change reuses the old review, a retry rereviews the
 // same commit or ignores a finding, a new commit is reviewed with the whole branch, a forged description grants a review,
-// an expanded deep-review path reuses an ordinary review, and a fourth round slips through.
+// an expanded deep-review path reuses an ordinary review, a third round with findings doesn't ask the author to rethink
+// the approach, and a round after the third stops the delivery or reviews the whole branch again.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -127,9 +128,14 @@ console.log(JSON.stringify({findings:diff.includes('bad change')?[{title:'有问
     assert.match(third, /bad change/);
     assert.match(third, /fix only/);
     assert.match(pr.body, /第 3 轮（[^\n]+，xhigh，审到 /);
+    assert.match(pr.body, /第 3 轮[^\n]+发现 1 条。\n\n已经审了 3 轮[^\n]+换个做法/);
     pr.head.sha = commit("later.txt", "fourth round");
-    assert.match(((await run(false, expandedDepth)) as { blocked: string }).blocked, /已审查 3 轮/);
-    assert.equal(readFileSync(reviewed, "utf8").trim().split("\n").length, 3);
+    pr.body = pr.body.replace(/处理：$/m, "处理：换了做法");
+    assert.deepEqual(await run(false, expandedDepth), []);
+    const fourth = JSON.parse(readFileSync(reviewed, "utf8").trim().split("\n")[3]);
+    assert.match(fourth, /fourth round/);
+    assert.doesNotMatch(fourth, /bad change/);
+    assert.match(pr.body, /第 4 轮[^\n]+没有发现问题/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
