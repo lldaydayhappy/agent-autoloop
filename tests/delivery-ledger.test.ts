@@ -1,7 +1,8 @@
 // Failure modes: a shared plan drops a repeated reviewer, a policy change reuses the old review, a retry rereviews the
 // same commit or ignores a finding, a new commit is reviewed with the whole branch, a forged description grants a review,
 // an expanded deep-review path reuses an ordinary review, a third round with findings doesn't ask the author to rethink
-// the approach, and a round after the third stops the delivery or reviews the whole branch again.
+// the approach, a round after the third stops the delivery or reviews the whole branch again, and a reviewer renamed by the
+// policy (an agent's deep reviewer, or the default raised to the same depth) reviews the whole branch again.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -10,6 +11,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { settings } from "../plugins/delivery/project.ts";
 import { readSharedPolicy, reviewDelivery, selectReview } from "../plugins/delivery/review.ts";
+import { reviewCovers } from "../plugins/delivery/review-policy.ts";
 
 test("a shared policy is read from main and can ask the same reviewer twice", async () => {
   const policy = await readSharedPolicy("example/config:policy.json", (repo) => async (path) => {
@@ -139,4 +141,22 @@ console.log(JSON.stringify({findings:diff.includes('bad change')?[{title:'有问
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("a round keeps its credit when the same model reviewed at the same depth, whatever the policy named it", () => {
+  const deep = { name: "codex-deep", model: "gpt-6.1-sol", effort: "xhigh" };
+  const plain = { name: "codex", model: "gpt-6.1-sol", effort: "high" };
+  // An agent's deep reviewer, then nobody declared: the default reviewer raised to xhigh by a deep-review path.
+  assert.ok(reviewCovers({ signature: "codex-deep/gpt-6.1-sol@xhigh", effort: "xhigh" }, [plain], ["xhigh"]));
+  assert.ok(reviewCovers({ signature: "gpt-6.1-sol", effort: "xhigh" }, [deep], ["xhigh"]));
+  assert.ok(!reviewCovers({ signature: "gpt-6.1-sol", effort: "high" }, [plain], ["xhigh"]));
+  assert.ok(
+    !reviewCovers({ signature: "codex/gpt-6.1-sol", effort: "high" }, [{ ...plain, model: "other" }], ["high"]),
+  );
+  assert.ok(
+    !reviewCovers({ signature: "codex-deep/gpt-6.1-sol@xhigh", effort: "xhigh" }, [deep, deep], ["xhigh", "xhigh"]),
+  );
+  const command = { name: "custom", command: ["node", "review.mjs"] };
+  const recorded = { signature: `command/${"0".repeat(64)}`, effort: "high" };
+  assert.ok(!reviewCovers(recorded, [command], ["high"]));
 });

@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { AGENT, git, matches, PLAIN_FILE_MODES, type Reviewer, type Settings } from "./project.ts";
 import { IN_THE_APP } from "../codex/agent.ts";
 import { findProgram } from "../../worker/agents.ts";
-import { reviewSignature, selectReview, type SharedPolicy } from "./review-policy.ts";
+import { reviewCovers, reviewSignature, selectReview, type SharedPolicy } from "./review-policy.ts";
 import { ledger, renderRound } from "./review-ledger.ts";
 
 export { readSharedPolicy, selectReview, sharedPolicy, type SharedPolicy } from "./review-policy.ts";
@@ -154,6 +154,10 @@ function reviewInput(bare: string, main: string, range: string[], config: Settin
   return { diff, prompt };
 }
 
+// A change of a few thousand lines read in depth takes longer than ten minutes; a limit under that ends every retry the
+// same way, from the start, while the project's one delivery slot waits. The round itself has two hours.
+export const REVIEW_MINUTES = 30;
+
 async function runReviewer(
   snapshot: string,
   reviewer: Reviewer,
@@ -170,7 +174,7 @@ async function runReviewer(
   const args = argv.slice(1).map((arg) => arg.replaceAll("{input}", changesFile));
   const child = execFile(...commandLine([argv[0], ...args]), {
     cwd: snapshot,
-    timeout: 600000,
+    timeout: REVIEW_MINUTES * 60_000,
     maxBuffer: 8 * 1024 * 1024,
   });
   child.stdin!.end(input.prompt);
@@ -180,8 +184,16 @@ async function runReviewer(
     child.stdout!.on("data", (chunk) => (stdout += chunk));
     child.stderr!.on("data", (chunk) => (stderr += chunk));
     child.on("error", reject);
-    child.on("close", (code) =>
-      code === 0 ? resolve(stdout) : reject(new Error(`审查没有完成：${stderr.slice(-1000)}`)),
+    child.on("close", (code, signal) =>
+      code === 0
+        ? resolve(stdout)
+        : reject(
+            new Error(
+              signal && child.killed
+                ? `审查超过 ${REVIEW_MINUTES} 分钟没有完成，已停止`
+                : `审查没有完成：${stderr.slice(-1000)}`,
+            ),
+          ),
     );
   });
   return parseReview(command ? text : readFileSync(output, "utf8"));
@@ -269,7 +281,7 @@ export async function reviewDelivery(
   const signature = reviewSignature(reviewers);
   const efforts = reviewers.map((reviewer) => depth(reviewer.effort, changed.inDepth));
   // The signed round also records effective depth. Expanding xhigh on main can change it without a new PR commit.
-  const previous = verified?.signature === signature && verified.effort === efforts.join(" + ") ? verified : undefined;
+  const previous = verified && reviewCovers(verified, reviewers, efforts) ? verified : undefined;
   let since: string | undefined;
   if (previous) {
     try {
