@@ -160,7 +160,7 @@ gh api repos/owner/app/statuses/<完整提交编号> -f context=delivery-agent/<
 
 `check.job` 写 job 的名字；矩阵 job（名字像 `check (ubuntu-latest)`）算同一个 job，每一项都要成功。检查工作流的触发类型要带 `ready_for_review`：草稿转 ready 后，只接受这之后新跑的一次检查，而 `pull_request` 默认不在转 ready 时触发。写成 `on: { pull_request: { types: [opened, synchronize, reopened, ready_for_review] } }`。
 
-当前提交最新的 `pull_request` 检查排队超过 10 分钟、一个任务都没创建时，插件会把 PR 转草稿再转正式，重新触发一次，只认可转回正式之后的新检查。同一个提交的自救记录随中台复查保留。新检查超过 10 分钟仍无任务时，交付立即退回，说明 GitHub 收下了检查却一直没有开始，等 GitHub 恢复后重新交付。已有任务在排队等机器时继续等待。其他情况仍最多等待 30 分钟，暂时的 GitHub 或执行错误按原有规则重试。手动触发的 `workflow_dispatch` 检查不作为合并依据。
+开始等待检查（草稿先转正式）后超过 10 分钟仍没有新 `pull_request` 检查，或者新检查尚未结束、创建超过 10 分钟仍没有 `check.job` 指定的必需任务，插件会把 PR 转草稿再转正式，重新触发一次，只认可转回正式之后的新检查，并重新计时。前置任务已经完成也不能代替必需任务。同一个提交的自救记录随中台复查保留。重新触发后按同样条件再次卡住时，交付立即退回，说明 GitHub 收下了检查却一直没有开始，等 GitHub 恢复后重新交付。必需任务已经创建、正在排队等机器或执行时继续等待，不因运行时间长而重新触发。其他情况仍最多等待 30 分钟，暂时的 GitHub 或执行错误按原有规则重试。手动触发的 `workflow_dispatch` 检查不作为合并依据。
 
 规则示例（把绝对路径、接单电脑和仓库改成自己的）：
 
