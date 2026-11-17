@@ -44,7 +44,7 @@
 ```jsonc
 {
   "timezone": "Asia/Shanghai", // 定时和“今天”用的时区，默认系统时区
-  "askFirst": ["删数据", "停服", "花钱", "对外发消息"], // 只有这几类事 Agent 才先问你
+  "askFirst": ["删数据", "停服", "花钱", "对外发消息", "改产品方向", "新建或轮换密钥", "修改权限"], // 只有这几类事 Agent 才先问你；不写就是这 7 类
   "sources": { "shop": { "name": "shop" }, "github": { "name": "GitHub", "adapter": "github" } },
   "agents": {
     "claude": {
@@ -200,7 +200,7 @@ GET /v1/work?claim=<这次领活的编号>&wait=50&running=7,8&capacity=1    Aut
   "askFirst": ["删数据", "…"],
   "context": {           // 接单程序把它写成文件交给 Agent，都是资料
     "events":  [{ "id", "source", "sourceName", "type", "subject", "summary", "detail", "link", "receivedAt" }],
-    "answers": [{ "card", "title", "options", "choice", "chosen", "text", "about", "by", "at" }],  // 这一轮要接着做的决定；choice 是从 0 起的下标，chosen 是所选那项的文字，自由文字回答时就是那句回答
+    "answers": [{ "card", "title", "options", "choice", "chosen", "text", "about", "by", "at", "events" }],  // 这一轮要接着做的决定；choice 是从 0 起的下标，chosen 是所选那项的文字，自由文字回答时就是那句回答；events 是问这张卡片的那一轮在做的那些事件的 id，那一轮本身是被回答叫起来的就接着往前找，业务靠它把做出来的结果对回自己给的 id，不是从哪一轮里问出来的就是空的
     "timers":  [{ "key", "about", "at" }],                                               // 这一轮到期的复查
     "waiting": [{ "key", "about", "at" }],                                               // 这个事项还没到期的复查
     "open":    [{ "card", "title", "text", "at" }],                                      // 同来源同组还没收尾的卡片
