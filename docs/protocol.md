@@ -201,8 +201,8 @@ GET /v1/work?claim=<这次领活的编号>&wait=50&running=7,8&capacity=1    Aut
   "context": {           // 接单程序把它写成文件交给 Agent，都是资料
     "events":  [{ "id", "source", "sourceName", "type", "subject", "summary", "detail", "link", "receivedAt" }],
     "answers": [{ "card", "title", "options", "choice", "chosen", "text", "about", "by", "at", "events" }],  // 这一轮要接着做的决定；choice 是从 0 起的下标，chosen 是所选那项的文字，自由文字回答时就是那句回答；events 是问这张卡片的那一轮在做的那些事件的 id，那一轮本身是被回答叫起来的就接着往前找，业务靠它把做出来的结果对回自己给的 id，不是从哪一轮里问出来的就是空的
-    "timers":  [{ "key", "about", "at" }],                                               // 这一轮到期的复查
-    "waiting": [{ "key", "about", "at" }],                                               // 这个事项还没到期的复查
+    "timers":  [{ "key", "about", "at", "events" }],                                     // 这一轮到期的复查；events 是约这次复查的那一轮在做的事件的 id，业务靠它对回自己给的 id
+    "waiting": [{ "key", "about", "at", "events" }],                                     // 这个事项还没到期的复查，字段与 timers 相同
     "open":    [{ "card", "title", "text", "at" }],                                      // 同来源同组还没收尾的卡片
     "decided": [{ "card", "title", "choice", "at" }]                                     // 这个事项定过的事，只对当时那件事有效；choice 已是所选那项的文字，不是下标
   }

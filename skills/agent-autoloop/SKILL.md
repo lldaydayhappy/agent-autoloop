@@ -104,7 +104,7 @@ Claude 主任务要委托 Codex 操作网页时，从 `examples/recipes/browser-
 "channels": { "feishu": { "key": "…", "user": "ou_用户的 open_id" } }
 ```
 
-同一个飞书应用的卡片点击只能有一个监听，只在一台电脑上跑。
+同一个飞书应用的卡片点击只能有一个监听，只在一台电脑上跑。重启后日志说“飞书那边还记着这个应用的另一条事件连接”，是飞书还没放开旧连接，可能要几个小时；中台每分钟重试一次，期间卡片点击收不到。`lark-cli event status`、`event stop` 只管本机，管不了飞书那边的旧连接；别的电脑也在跑这个应用的监听就先停掉它。
 
 **只会发文字的（钉钉、企微的群机器人，Slack、Discord 的 Webhook）**：用 `plugins/webhook/channel.ts`，`config.json` 的通道项写 `"use": "webhook"`、`"platform": "dingtalk"` 和 `"url": "已有的 Webhook 地址"`；平台也可选 `wecom`、`slack`、`discord`。别的平台只要收 JSON POST 也能接：不写 `platform`，写 `url` 和带 `{text}` 的 `body`，比如 Telegram 写 `"url": "https://api.telegram.org/bot<机器人令牌>/sendMessage"`、`"body": { "chat_id": "…", "text": "{text}" }`。`rules.json` 里写 `"links": true`，卡片链接本身就能回答；`config.json` 的 `hub.publicUrl` 要配成手机或电脑能打开的地址。
 
