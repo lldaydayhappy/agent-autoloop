@@ -223,8 +223,9 @@ test("the reviewer reads the branch's final change: code it wrote and took back,
   assert.doesNotMatch(changes, /taken back/);
   assert.doesNotMatch(changes, /fromMain/);
 });
-test("tests are set apart for a light read, except the project's guard tests", async () => {
-  using p = project();
+test("tests are set apart for a light read, except the project's guard tests and paths reviewed in depth", async () => {
+  using p = project(() => ({ xhigh: [".github/**/*"] }));
+  p.write(".github/workflows/ship.test.yml", "name: ship\n");
   p.write("app.ts", "export const version = 2;\n");
   p.write("tests/app.test.ts", "// checks the version\n");
   p.write("tests/guard-writes.test.ts", "// guards the writes\n");
@@ -234,6 +235,7 @@ test("tests are set apart for a light read, except the project's guard tests", a
   assert.ok(tests > 0);
   assert.ok(changes.indexOf("tests/app.test.ts") > tests);
   assert.ok(changes.indexOf("tests/guard-writes.test.ts") < tests);
+  assert.ok(changes.indexOf("ship.test.yml") < tests);
   assert.ok(changes.indexOf("app.ts") < tests);
 });
 test("a root file named like a commit is reviewed as a file", async () => {

@@ -92,7 +92,9 @@ export function renderRound(
         ]
       : []),
     ...blocking.map(({ title, how, text }, index) => {
-      const body = [`怎么发生：${how}`, ...text.replaceAll("\r\n", "\n").split("\n")]
+      const body = `怎么发生：${how}\n${text}`
+        .replaceAll("\r\n", "\n")
+        .split("\n")
         .map((line) => (line ? `   ${line}` : ""))
         .join("\n");
       return `\n${current.numbered + index + 1}. **${oneLine(title)}**\n\n${body}\n\n   处理：`;
