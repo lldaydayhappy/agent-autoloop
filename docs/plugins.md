@@ -29,11 +29,13 @@ node --disable-warning=ExperimentalWarning --test --test-name-pattern='agent-aut
 | 导出对象的方法               | 作用                                                                                                                          |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `command(turn)`              | 返回命令参数数组；参数不作为 shell 代码执行                                                                                   |
-| `read(stdout, code, stderr)` | 返回 `text`、`session`、`usage`、`sessionUsage`、`error`、`finished`、`started`；运行中 `code` 为 `null`                      |
+| `read(stdout, code, stderr)` | 返回 `text`、`session`、`usage`、`sessionUsage`、`error`、`limitedUntil`、`finished`、`started`；运行中 `code` 为 `null`      |
 | `link(session)`              | 可选，打开这个会话的链接。回执写错时，`read` 返回了 `session` 的插件都只重写回执，和有没有链接无关                            |
 | `check(program)`             | 可选，`doctor` 问它这个 Agent 现在能不能用：能用返回 `null`，否则返回下一步怎么做。参数是规则里给它写的 `program`，没写就不传 |
 
 `turn` 一定有的是 `prompt`、`session`、`resume`、`cwd`、`access`、`contextFile`、`folder`，另外五个只有规则里给这个 Agent 写了才有：`model`、`effort`、`tier`、`command`、`program`。`resume` 是这一轮要接回的原会话，新开一轮时是 `null`。`contextFile` 是资料文件，受限 CLI 需要允许读取 `folder`。`program` 是内置插件换成的启动程序，第三方插件用不上，收下也可以不理。`tier` 是服务档位，用的是那个 CLI 自己的叫法，现在只有内置的 Codex 插件用它（传成 `-c service_tier="…"`，`priority` 就是 Codex 应用里的 Fast），别的插件收下不理。那五个都按「可能没有」来读，内置插件就是这么写的：`...(turn.model ? ["--model", turn.model] : [])`、`turn.command ?? []`。`read` 要能处理未写完的输出；CLI 真正完成后才返回 `text`。`read` 抛错或什么也不返回时，还在跑的接着跑，结束后这一轮算没跑成，留在原会话重派。
+
+CLI 因为用量到了上限（订阅额度、限流窗口）没跑成时，和 `error` 一起返回 `limitedUntil`：它能再干活的时间，带时区的 ISO 文字。接单程序把它随 `failed` 交给中台，中台到这个时间前不再派活给这个 Agent，排着的事件到点接着派，也不为它开新会话重试；时间写错的不交。内置的 Claude Code 插件读 `api_error` 为 `usage_limit_reached` 的结果，时间取它之前 `rate_limit_event` 里的 `resetsAt`，没有就按一小时后。
 
 支持 `resume` 的插件，从 Agent 收下提示词起都要返回 `started: true`，包括运行中和出错之后。否则干到一半断了，也会被当成会话接不上，开新会话把业务重做一遍。返回了 `session` 就要按 `turn.resume` 接回原会话：没跑成的重派和写错回执的重写都靠它；接不回去的 CLI 不要返回 `session`。
 

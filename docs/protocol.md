@@ -219,7 +219,7 @@ POST /v1/runs/12/result    Authorization: Bearer <token>   Result
 // Result
 {
   "outcome": "done" | "nothing" | "failed" | "cancelled",
-  "summary": "一句话", "error": "没跑成的原因", "session": "…",
+  "summary": "一句话", "error": "没跑成的原因", "limitedUntil": "2026-11-06T13:50:00+08:00", "session": "…",
   "usage": { "input": 0, "output": 0, "cached": 0, "cost": 0 },
   // 下面就是回执，一个事务里一次生效
   "ask":     [{ "title", "text", "options": ["…", "…"], "recommend": 0, "about": "留给接着干的自己", "key": "这件事的固定名字" }],
@@ -232,6 +232,7 @@ POST /v1/runs/12/result    Authorization: Bearer <token>   Result
 
 - 结果可以重放：响应丢了，同一个 token 再交一次同样的内容，得到同样的确认；内容不同返回 409。
 - `failed` 会重派，所以它只带 `notice`，其余的不生效；本人要停的这一轮交 `failed` 不再重派，`notice` 也不生效。
+- `limitedUntil` 只能和 `failed` 一起交，要带时区：这个 Agent 的用量到了上限（比如 Claude Code 订阅的 5 小时额度），这个时间前干不了活。中台到这个时间前不再把这个 Agent 的任何一轮派出去（所有用它的规则都算），这一轮也到这时才重派；排着的、等重试的和这期间新来的事件照常排队，不跳过，到点自动接着派。第一次碰到时发一张通知卡片，写明几点恢复；恢复时间相同的其他几轮（包括同一账号下的其他 Agent）再碰到不重复发，碰到更晚的时间才延长、换一张新的。恢复后卡片自动关掉。限制按 Agent 算（`rules.json` 的 `agents` 里的一项），几个 Agent 用同一个账号时各自碰到一次才停。本人手动运行（`run`）的一轮不受这个限制，用来提前试：它跑通（`done` 或 `nothing`）就解除，碰到上限的那几轮也马上接着派。早于现在、或比现在晚 8 天以上的时间不起作用（用量额度最长一周恢复，更远的多半是读错了），按普通的没跑成重派。老中台不认识这个字段，会拒收整份结果：中台和接单程序分开部署时先升中台。
 - 需要本人恢复连接、登录或身份验证时，用 `done` 结束本轮并交 `ask`，不交 `failed`。`done` 表示本轮结束，未完成的事项由卡片继续跟进，不代表网页已经验收。同一阻塞已有 `open` 卡片时不重复提问，不用 `later` 定时重试；`waiting` 里同一阻塞已有的复查用 `cancel` 取消。保留已完成业务，`about` 写清恢复后只做哪些剩余步骤。
 - `usage` 由接单程序上报本次执行的用量，包含这次执行的回执重写；每一项都可以没有：`input`、`output`、`cached` 是 Token 数，`cost` 是美元。`input` 是全部输入，包括从缓存读的和写进缓存的；`cached` 是其中从缓存读的部分，价格通常只有一小部分，所以单独列出。中台把同一轮各次执行的已报数值相加，重复提交不重复计费；没有上报的字段保持缺省，不当成零。`agent-autoloop status` 按完成时间汇总今天和最近 7 天已结束的轮次，没上报的轮数如实写出来。
 - 有的 Agent 只给会话累计值（Codex 的 Token、Claude Code 的费用）。接单程序减去这次启动前的累计值再上报，所以这里总是本次的量；没有记录的续接不报这几项，详见[插件说明](plugins.md#agent-插件)。
@@ -270,7 +271,7 @@ POST /v1/runs/12/result    Authorization: Bearer <token>   Result
 ```ts
 export default {
   command: (run) => [...],                                         // 这一轮的命令行，run.resume 是要接着的会话
-  read: (output) => ({ text, session, usage, finished, started }), // 从输出里读出最后一条消息和会话
+  read: (output) => ({ text, session, usage, finished, started }), // 从输出里读出最后一条消息和会话；没跑成时给 error，用量到上限再给 limitedUntil
   link: (session) => "…",                                          // 可选：打开这个会话的链接
 };
 ```
@@ -316,6 +317,8 @@ POST /v1/runs/12/cancel     {}
 ```
 
 `agent-autoloop status`、`answer`、`resolve`、`stop` 就是这几个请求。
+
+`agents` 里每一项多一个 `limited`：用量到上限、还没到恢复时间时是 `{ "until", "reason", "since" }`（`reason` 是 Agent 的原话），否则是 `null`。
 
 `channels` 里的 `online` 只说明通道程序还在来领卡片，不说明卡片送到了：最近一张卡片没送到时，这个通道多一项 `lastFailure`（`card`、`tries`、通道报的 `error`，`givenUp` 表示试满了一小时、已经放弃；卡片在送到前被结掉也不会再发），送到了或还没发过就没有这一项，`agent-autoloop doctor` 照它提醒。
 
@@ -396,6 +399,7 @@ POST /v1/rules/巡检/run        { "subject": "#12", "reason": "看一眼" }    
 | 规则删掉或改名了                         | 还没领走的和之后没跑成的这一轮记为 `cancelled`，不再派发，发一张通知卡片；之后到期的复查也不再派发，同样发通知卡片，写明复查的开头；已经在跑的跑完照常收结果                                                                                                                                                                                                              |
 | 规则暂停了                               | 到点跳过、事件不接，都不积压；排队的留着；恢复后不自动补跑，定时的从下一个时刻照常跑；恢复时列出跳过的事件，用 `replay` 补跑，每条只补一次                                                                                                                                                                                                                                |
 | 暂停写了 `until`，中台到点时没开着       | 醒来就恢复，暂停期间的时刻不补                                                                                                                                                                                                                                                                                                                                            |
+| Agent 用量到上限                         | 插件交回 `limitedUntil` 时（内置的 Claude Code 插件会交），到这个时间前不再派活给这个 Agent，排着的和新来的都留着，到点自动接着派；发一张通知卡片写明几点恢复，只发一次，恢复后自动关掉；本人手动运行一轮可以提前试，跑通就解除 |
 | 规则文件被删、移走或读不到               | 旧规则继续跑，告诉你一次；放回去就接着用。从没载入过规则的新中台读不到就不启动                                                                                                                                                                                                                                                                                            |
 
 这是“至少一次”的系统：Agent 可能被叫两次，所以 Skill 里有副作用的动作要先核实当前状态。

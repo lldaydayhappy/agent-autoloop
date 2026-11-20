@@ -36,6 +36,8 @@ export type Reading = {
   /** What the session has used so far, for amounts the program only gives that way. */
   sessionUsage?: Usage;
   error?: string;
+  /** With `error`: it's out of quota, such as a subscription's usage limit, and can take no work before this ISO time. */
+  limitedUntil?: string;
   /** Its turn is over, though it may not have exited. */
   finished?: boolean;
   /** It has this turn's prompt, in a conversation that's there. From here on the work may be half done. */

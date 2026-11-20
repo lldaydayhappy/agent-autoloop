@@ -194,10 +194,11 @@ export function render(state: any, { color, columns }: { color: boolean; columns
   const whereRoom = Math.max(0, ...presence.map((one) => width(one.where)));
   for (const one of presence) {
     const head = `  ${one.online ? green("●") : red("○")} ${pad(one.name, nameRoom)}  `;
-    if (one.online) say(head + dim(one.where));
+    const limited = one.limited ? `  ${yellow(`用量到上限，${when(one.limited.until)} 自动恢复`)}` : "";
+    if (one.online) say(head + dim(one.where) + limited);
     else
       say(
-        `${head}${dim(pad(one.where, whereRoom))}  ${red(`离线，最后在线 ${one.seenAt ? when(one.seenAt) : "没见过"}`)}`,
+        `${head}${dim(pad(one.where, whereRoom))}  ${red(`离线，最后在线 ${one.seenAt ? when(one.seenAt) : "没见过"}`)}${limited}`,
       );
   }
 

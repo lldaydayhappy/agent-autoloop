@@ -23,6 +23,7 @@ const VIEWS = {
   seen: "kind name seen_at",
   keys: "kind name hash created_at",
   pauses: "name by reason since until",
+  limits: "agent until reason since",
 };
 
 /** Made anew at every start, so changing them takes no rebuild and no migration. */
@@ -240,7 +241,10 @@ export function stateOf(now: number, before: number | undefined, rules: Rules, {
     }),
     agents: Object.entries(rules.agents).map(([id, { name, use, worker, program }]) => {
       const totals = tally(counts.filter((row) => row.agent === id));
-      return { id, name, use, worker, ...(program && { program }), ...presence(`worker:${worker}`), totals };
+      // Like a pause, one past its end is lifted at the next tick and already holds nothing.
+      const limit = all<Row>("SELECT until, reason, since FROM limits WHERE agent = ?", [id])[0];
+      const limited = limit && Date.parse(limit.until) > now ? limit : null;
+      return { id, name, use, worker, ...(program && { program }), ...presence(`worker:${worker}`), totals, limited };
     }),
     channels: Object.entries(rules.channels).map(([id, { name }]) => {
       // Coming back says the channel's program runs, not that a card got through: the last one it was given says that.
