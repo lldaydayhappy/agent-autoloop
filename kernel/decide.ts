@@ -114,7 +114,7 @@ function assignQueued(draft: Draft, run: Row) {
   const rule = ruleOf(config.value as Rules, run.rule);
   if (!rule) return;
   const session = rule.to === run.agent ? {} : nulls("session", "resume");
-  put(draft, "runs", run.id, { agent: rule.to, rules_version: config.version, ...session });
+  put(draft, "runs", run.id, { agent: rule.to, grp: rule.group, rules_version: config.version, ...session });
 }
 const threadOf = (run: Row) => ({ rule: run.rule, lane: run.lane, grp: run.grp });
 
@@ -738,10 +738,23 @@ const CONTROL = {
 const HANDLERS: Record<string, (draft: Draft, ...args: any[]) => unknown> = {
   rules(draft, rules) {
     put(draft, "config", "rules", { value: rules, version: draft.seq });
+    // A schedule's next moment was worked out on the old zone's clock. Forgetting the cron it was counted for has the next
+    // tick count again from then, as for a changed cron; this input's own clock isn't the tick's.
+    if (draft.rules && rules.timezone !== draft.rules.timezone) {
+      for (const schedule of rows(draft.view, "schedules")) put(draft, "schedules", schedule.rule, { cron: null });
+    }
     for (const run of rows(draft.view, "runs", { state: "queued" })) {
       if (ruleOf(rules, run.rule)) assignQueued(draft, run);
       else stopRun(draft, run, "rule-gone", ...ruleGone(run.rule));
     }
+    // Groups are counted, and open cards found, by the group on each row: what's going and what's left open move with
+    // their rule, or the old group and the new each let a run through.
+    const moved = (table: Table, row: Row) => {
+      const group = ruleOf(rules, row.rule)?.group;
+      if (group !== undefined && group !== row.grp) put(draft, table, row.id, { grp: group });
+    };
+    for (const run of rows(draft.view, "runs", { state: ["claimed", "unknown"] })) moved("runs", run);
+    for (const card of rows(draft.view, "cards", { state: "open" })) moved("cards", card);
     closeOpen(draft, (key) => key.startsWith("rules:"), "改好了");
   },
   rulesError: (draft, problem) => notify(draft, `rules:${digest(problem)}`, "rules.json 写错了，还在用旧规则", problem),

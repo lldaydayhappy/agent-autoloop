@@ -1,6 +1,7 @@
 // What's different about each agent. Failure cases: a level of access maps to the wrong flag, full access is given unasked,
-// a retry starts a new conversation instead of going on, an error or a turn that never finished counts as an answer, a
-// reconnect Codex announced and got over before its turn finished fails the finished run, a program's warning is taken
+// a retry starts a new conversation instead of going on, an error or a turn that never finished counts as an answer, the
+// reason a run failed starts half way through a character when the CLI printed more than 300 units, a reconnect Codex
+// announced and got over before its turn finished fails the finished run, a program's warning is taken
 // for its answer, a finished Claude run printed as one JSON array is read as a failure, the
 // session isn't picked out, a command line's placeholder isn't filled in, or a background Codex run assumes it inherited
 // an application's browser connection. A turn that got going and then broke, or was killed before it finished, doesn't
@@ -16,7 +17,8 @@
 // something other than what the event said. A built-in agent starts the program it finds, not the one its rules name,
 // so a wrapper that sends Claude Code to another service is never run. A service tier the rules name for Codex never
 // reaches its command line, so the run takes whatever tier the machine's own Codex config has that day. A program
-// missing for a moment, as while an update reinstalls it, stays missing until the worker restarts.
+// missing for a moment, as while an update reinstalls it, stays missing until the worker restarts. A program a terminal
+// finds only because ~/.zshrc or ~/.bashrc puts its folder on PATH is missing for a worker launchd or systemd started.
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -368,6 +370,11 @@ test("a plain command: placeholders filled in, stdout is its last message, a bad
   assert.deepEqual(command.read("好了\n", 0, ""), { text: "好了\n" });
   assert.deepEqual(command.read("中途", null, ""), {});
   assert.match(command.read("", 3, "boom").error!, /退出码 3：boom/);
+  // Its output is kept from the end, so the window can begin half way through a character; a lone half can't be stored or
+  // printed, and the hub holds this string in `runs.error` for `status` to read.
+  const half = command.read("", 3, `😀${"x".repeat(299)}`).error!;
+  assert.ok(half.isWellFormed(), half);
+  assert.equal(half, `退出码 3：${"x".repeat(299)}`);
   assert.equal(command.link, undefined, "it has no session to go on in");
 });
 
@@ -390,6 +397,29 @@ test("a plain command's prompt reaches the program as it was written, whatever i
 
 test("a program that isn't there says so", () => {
   assert.throws(() => findProgram("surely-not-installed-anywhere"), /找不到 surely-not-installed-anywhere/);
+});
+
+test("a program on the PATH a terminal's shell sets up is found", { skip: process.platform === "win32" }, () => {
+  const folder = setup("adapters-terminal");
+  const program = join(folder, "terminal-agent");
+  writeFileSync(program, "", { mode: 0o755 });
+  // Like zsh: a login shell that isn't interactive skips ~/.zshrc, and an interactive one may print before the PATH.
+  const terminal = join(folder, "shell.sh");
+  writeFileSync(
+    terminal,
+    `#!/bin/sh\n[ "$1 $2" = "+m -ic" ] || exit 1\nprintf '%s\\n' 'Welcome back' "/nonexistent:${folder}"\n`,
+    {
+      mode: 0o755,
+    },
+  );
+  const shell = process.env.SHELL;
+  process.env.SHELL = terminal;
+  try {
+    assert.equal(findProgram("terminal-agent"), program);
+  } finally {
+    if (shell === undefined) delete process.env.SHELL;
+    else process.env.SHELL = shell;
+  }
 });
 
 test("a program missing at one lookup is found at the next once it's back", () => {

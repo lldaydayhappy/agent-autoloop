@@ -1,6 +1,7 @@
 // `agent-autoloop runs`: the finished runs before the few `status` shows, so `why` can be given a number. It pages through
-// /v1/state the way any owner's client can; picking one rule is done here, so the protocol stays as it is.
-import { finished, runRows } from "./status.ts";
+// /v1/state on older hubs; newer ones can return one rule's finished runs in one request.
+import { HubError, type Hub } from "../protocol/client.ts";
+import { finished, runRows, shellWord } from "./status.ts";
 
 type Page = (before?: number) => Promise<any>;
 
@@ -31,6 +32,18 @@ export async function findRuns(
   }
 }
 
+export async function readRuns(owner: Pick<Hub, "state" | "ruleRuns">, rule?: string, before?: number) {
+  if (rule) {
+    try {
+      const page = await owner.ruleRuns(rule, before);
+      return { state: page, runs: page.runs, more: page.nextBefore };
+    } catch (error) {
+      if (!(error instanceof HubError && error.status === 404)) throw error;
+    }
+  }
+  return findRuns(owner.state, { rule, before });
+}
+
 export function runsText(
   found: Awaited<ReturnType<typeof findRuns>>,
   { rule, color, columns }: { rule?: string; color: boolean; columns?: number },
@@ -39,7 +52,7 @@ export function runsText(
   const lines = runRows(found.state, found.runs, { color, columns });
   lines.push("", "细节：agent-autoloop why <第几轮>");
   if (found.more !== null) {
-    const named = rule === undefined ? "" : ` ${/^[^\s"'\\$`]+$/.test(rule) ? rule : JSON.stringify(rule)}`;
+    const named = rule === undefined ? "" : ` ${shellWord(rule)}`;
     lines.push(`更早的：agent-autoloop runs${named} --before ${found.more}`);
   }
   return lines.join("\n");

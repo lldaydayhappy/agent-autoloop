@@ -53,7 +53,7 @@ description: 配置 Agent 自动化中台：加规则、接新的事件插件、
 
 1. **对方能发 HTTP**：`agent-autoloop key new source <名字>` 拿密钥（这是新建密钥，先问用户），`rules.json` 的 `sources` 登记，对方 `POST /v1/events`。对方要知道这件事后来做完没有、结论是什么，用同一把密钥 `GET /v1/events/<应答里的 event>`，不用给它本人的密钥。
 2. **对方有自己的 Webhook 格式**：在 `~/.agent-autoloop/plugins/<名字>/source.ts` 写一个函数，验签并翻译成事件（见 `plugins/github/source.ts`），来源写 `"adapter": "<名字>"`，地址是 `/v1/in/<来源>`，秘密放 `~/.agent-autoloop/secrets.env` 的 `AGENT_AUTOLOOP_SECRET_<来源>`（来源名转大写，`-` 换成 `_`），改完重启中台（`agent-autoloop service install`）。对方要能连到中台，所以中台要在服务器上，或者用隧道。
-3. **对方推不过来，或者中台在家里**：定时跑一段脚本轮询，见 `examples/watch-github-issues.sh`。规则用 `use: "command"` 的 Agent，写上 `emits`。没新东西不花 Token。
+3. **对方推不过来，或者中台在家里**：定时跑一段脚本轮询，见 `examples/recipes/github-issues/watch.ts`（规则里写 `["node", "<路径>", "owner/repo"]`，Windows 也能跑）。规则用 `use: "command"` 的 Agent，写上 `emits`。没新东西不花 Token。
 
 ## 接一个 Agent
 
@@ -241,7 +241,7 @@ MCP 服务不区分调用方，都按本人记录（`answer` 记成本人，`emi
 
 电脑不用开放任何端口，它们自己连过去。
 
-服务器上自己写的系统级 systemd unit，名字要和 `agent-autoloop service install` 用的一样（默认 `agent-autoloop`），`doctor` 才认得出。`agent-autoloop update` 不碰它，更新后自己运行 `systemctl restart` 才会用上新版。
+服务器上自己写的系统级 systemd unit，名字要和 `agent-autoloop service install` 用的一样（默认 `agent-autoloop`），`doctor` 才认得出。`agent-autoloop update`、再跑一遍安装命令和 `service install` 都不碰它，只提示你自己运行 `systemctl restart`，运行后才会用上新版。
 
 ## 日志与恢复
 

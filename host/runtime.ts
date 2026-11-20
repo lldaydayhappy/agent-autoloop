@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { HOME, RULES_FILE } from "./home.ts";
 import { privateDirectory } from "./files.ts";
-import { skippedOf, stateOf as state, viewStatements } from "./state.ts";
+import { ruleHistory, skippedOf, stateOf as state, viewStatements } from "./state.ts";
 import { cardHash, digest, whose as keyHolder } from "../kernel/credentials.ts";
 import { decide } from "../kernel/decide.ts";
 import { NotFound } from "../kernel/errors.ts";
@@ -57,6 +57,10 @@ const format = digest(
 );
 let current = openView(db, format);
 db.exec(CARD_HASH_INDEX);
+// Only the history reader needs this index. Adding it to an existing projection doesn't require replaying the log.
+db.exec(`CREATE INDEX IF NOT EXISTS projection_run_history
+  ON projections(collection, json_extract(data,'$.rule'), json_extract(data,'$.id'))
+  WHERE collection='runs'`);
 
 export const all = <T>(sql: string, params: SQLInputValue[] = []) =>
   db
@@ -148,12 +152,20 @@ export const view = (card: Row, ref: string | null = null, links = false) =>
   query.cardView(card, environment, ref, links);
 export const unrouted = (limit = 20) => query.unrouted(getView(), limit);
 export const skipped = (rule: string, since: string, everything = false) => skippedOf(all, rule, since, everything);
+export const runsOfRule = (rule: string, before?: number) => snapshot(() => ruleHistory(all, rule, before));
+
 /** Read in one snapshot: its seq is where the log stood for all of it, for a client to go on in /v1/stream from. */
 export function stateOf(now = Date.now(), before?: number) {
-  db.exec("BEGIN");
-  try {
+  return snapshot(() => {
     const latest = getView();
     return { seq: latest.seq, ...state(now, before, query.configuration(latest), { all, view, unrouted }) };
+  });
+}
+
+function snapshot<T>(read: () => T): T {
+  db.exec("BEGIN");
+  try {
+    return read();
   } finally {
     db.exec("COMMIT");
   }

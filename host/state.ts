@@ -123,6 +123,41 @@ export function skippedOf(all: Reads["all"], rule: string, since: string, everyt
   return { count, events: events.map(skippedView) };
 }
 
+function runView(run: Row, all: Reads["all"]) {
+  return {
+    id: run.id as number,
+    rule: run.rule,
+    agent: run.agent,
+    state: run.state,
+    attempts: run.attempts,
+    createdAt: run.created_at,
+    claimedAt: run.claimed_at,
+    finishedAt: run.finished_at,
+    notBefore: run.not_before,
+    summary: run.summary ?? "",
+    error: run.error ?? "",
+    link: run.link ?? "",
+    session: run.session,
+    usage: run.usage ? JSON.parse(run.usage) : null,
+    stopping: run.cancel_at !== null,
+    manual: Boolean(run.manual),
+    events: all<Row>(EVENTS_OF_RUN, [run.id]),
+  };
+}
+
+export function ruleHistory(all: Reads["all"], rule: string, before?: number) {
+  const limit = 20;
+  const rows = all<Row>(
+    `SELECT * FROM runs WHERE rule = ? AND state NOT IN ('queued', 'claimed') ${before === undefined ? "" : "AND id < ?"}
+     ORDER BY id DESC LIMIT ?`,
+    before === undefined ? [rule, limit + 1] : [rule, before, limit + 1],
+  );
+  return {
+    runs: rows.slice(0, limit).map((run) => runView(run, all)),
+    nextBefore: rows.length > limit ? rows[limit - 1].id : null,
+  };
+}
+
 export function stateOf(now: number, before: number | undefined, rules: Rules, { all, view, unrouted }: Reads) {
   const seen = new Map(
     all<Row>("SELECT kind, name, seen_at FROM seen").map((row) => [`${row.kind}:${row.name}`, row.seen_at as string]),
@@ -220,25 +255,7 @@ export function stateOf(now: number, before: number | undefined, rules: Rules, {
         : undefined;
       return { id, name, ...presence(`channel:${id}`), ...(lastFailure && { lastFailure }) };
     }),
-    runs: visible.map((run) => ({
-      id: run.id as number,
-      rule: run.rule,
-      agent: run.agent,
-      state: run.state,
-      attempts: run.attempts,
-      createdAt: run.created_at,
-      claimedAt: run.claimed_at,
-      finishedAt: run.finished_at,
-      notBefore: run.not_before,
-      summary: run.summary ?? "",
-      error: run.error ?? "",
-      link: run.link ?? "",
-      session: run.session,
-      usage: run.usage ? JSON.parse(run.usage) : null,
-      stopping: run.cancel_at !== null,
-      manual: Boolean(run.manual),
-      events: all<Row>(EVENTS_OF_RUN, [run.id]),
-    })),
+    runs: visible.map((run) => runView(run, all)),
     hasMore,
     nextBefore: hasMore ? page[PAGE - 1].id : null,
     unrouted: unrouted(),

@@ -16,6 +16,7 @@
 // in meanwhile loses the session of the answer in it, or has it wiped by what had none. A run with events from two
 // sources is given, or closes, cards that have no source. A channel that takes a card and never reports gets it for ever.
 // A card closed while its first message is on the way never gets that message updated.
+// After a rule moves to another group, its next run isn't given the cards its earlier runs left open (issue #362).
 // A channel whose program keeps coming but whose last card didn't get through looks fine in the state (issue #290).
 // A rule that lists its channels has its cards, and the notices of its runs, sent to others as well; one that lists none
 // stops reaching every channel; a notice of nobody's rule reaches only some. With defaultChannels, a card that names no
@@ -433,6 +434,21 @@ test("a card made after this run was claimed isn't in its scope", () => {
   assert.deepEqual(
     receipt.rejected.map((r) => r.card),
     [later],
+  );
+});
+
+test("a rule moved to another group still gets the cards it left open", () => {
+  clean();
+  const mine = asked(1).id;
+  underRules(
+    (rules) => (rules.rules[0].group = "moved"),
+    () => {
+      ingest("app", note(2), at(1));
+      assert.deepEqual(
+        claim("w1", at(2))!.context.open.map((c) => c.card),
+        [mine],
+      );
+    },
   );
 });
 
