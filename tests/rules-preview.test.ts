@@ -1,6 +1,6 @@
 // Failure modes: explain prints a rule's private prompt; a dry run writes to the hub instead of previewing; the
 // preview ignores another rule for the same event; a bad subcommand is accepted silently; a dry run with another source's key
-// previews this machine's source instead.
+// previews this machine's source instead; explain leaves out the tags a rule is grouped by.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -29,6 +29,10 @@ test("the explanation shows rule and Agent claim limits independently", () => {
   assert.match(
     lines.find((line) => line.startsWith("  意见："))!,
     /会话标题 note-\{id\}/,
+  );
+  assert.match(
+    lines.find((line) => line.startsWith("  意见："))!,
+    /标签 shop、反馈/,
   );
 });
 const home = setup("rules-preview");

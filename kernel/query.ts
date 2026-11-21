@@ -147,7 +147,7 @@ export function cardView(card: Row, env: Environment, ref: string | null = null,
 
 export function jobOf(view: View, run: Row, env: Environment): Job {
   const rules = configuration(view, run.rules_version);
-  const { name, cwd, skill, prompt, title, emits } = ruleOf(rules, run.rule)!;
+  const { name, cwd, skill, prompt, title, emits, tags } = ruleOf(rules, run.rule)!;
   const { maxActive: _maxActive, ...agent } = rules.agents[run.agent];
   const events = eventsOf(view, run.id);
   const eventIds = events.map((event) => event.id);
@@ -211,6 +211,7 @@ export function jobOf(view: View, run: Row, env: Environment): Job {
         .map(({ id, title, choice, answer, options, decided_at }) => {
           return { card: id, title, choice: choice === null ? answer : JSON.parse(options)[choice], at: decided_at };
         }),
+      ...(tags && { tags }),
     },
   };
 }
