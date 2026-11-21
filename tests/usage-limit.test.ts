@@ -3,9 +3,10 @@
 // again, until the owner stopped 93 of them. Failure cases: once one round says the agent is limited until a time, other
 // rounds for it are still handed out before then, or rounds for other agents are held too; events that come meanwhile are
 // dropped or skipped instead of waiting; nothing starts again by itself at that time, or the round that hit the limit is
-// tried before it; the owner isn't told when it comes back, is told once per round or per agent that hit it, or the card
-// stays open after it's back; the owner can't try the agent before then, or a round that got through then leaves the hold
-// in place, or the rounds that hit the limit still wait for the reset; a time that isn't one, or one on a round that didn't
+// tried before it; the owner isn't told when it comes back, is told once per round or per agent that hit it, or the shared
+// card points at an agent that's already back, closes while another is still held, or stays open after they're all back; the
+// owner can't try the agent before then, or a round that got through then leaves the hold in place, or the rounds that hit
+// the limit still wait for the reset; a time that isn't one, or one on a round that didn't
 // fail, is taken; a time days off, which no usage limit gives, holds the agent that long; the hold is lost when the
 // projection is rebuilt from the log.
 import assert from "node:assert/strict";
@@ -82,8 +83,19 @@ test("agents on one account, told the same reset, make one card, closed when the
   finish(first.run, first.token, limited(at(60)), at(2));
   finish(second.run, second.token, limited(at(60)), at(2));
   assert.deepEqual(
+    notices().map(({ title, state }) => ({ title, state })),
+    [{ title: "Agent 用量到上限", state: "open" }],
+  );
+  assert.match(notices()[0].text, /agent-autoloop status/);
+  assert.doesNotMatch(notices()[0].text, /甲|乙|意见|告警/);
+  execute("runRule", ["告警", "owner", {}], at(3));
+  const probe = claimNext("w2", "probe-w2", at(3))!;
+  finish(probe.run, probe.token, { outcome: "nothing", summary: "没事" }, at(4));
+  assert.ok(stateOf(at(4)).agents.find((agent) => agent.id === "a1")!.limited, "the other agent is still held");
+  assert.deepEqual(
     notices().map((card) => card.state),
     ["open"],
+    "one agent recovering early does not close their shared notice",
   );
   tick(at(60));
   assert.deepEqual(
