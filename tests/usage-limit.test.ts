@@ -8,7 +8,8 @@
 // owner can't try the agent before then, or a round that got through then leaves the hold in place, or the rounds that hit
 // the limit still wait for the reset; a time that isn't one, or one on a round that didn't
 // fail, is taken; a time days off, which no usage limit gives, holds the agent that long; the hold is lost when the
-// projection is rebuilt from the log.
+// projection is rebuilt from the log; the state view still reports the agent as held after its reset has passed, until a
+// tick lifts the row.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { at, setup } from "./helpers.ts";
@@ -63,6 +64,12 @@ test("an agent out of quota is handed nothing until it resets, and what comes me
   assert.equal(claim(at(7))!.rule.name, "巡检", "another agent on the same worker goes on");
   tick(at(59));
   assert.equal(claim(at(59)), null);
+  // The row is still there — no tick has lifted it — but the moment it named has passed, and it already holds nothing.
+  assert.equal(
+    stateOf(at(60) + 1).agents.find((agent) => agent.id === "a1")!.limited,
+    null,
+    "past its reset an agent is free, before the tick that lifts the row",
+  );
   tick(at(60));
   const after = [claim(at(60)), claim(at(60)), claim(at(60))];
   assert.ok(
