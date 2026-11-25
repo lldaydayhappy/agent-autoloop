@@ -178,6 +178,7 @@ rules.json 里这个定时任务要写 cwd；你答了，中台叫醒它的 Agen
 };
 
 type Flags = Record<string, string | true>;
+const BOOLEAN_FLAGS = new Set(["dry-run", "json", "no-service", "yes"]);
 
 function flags(args: string[]) {
   const named: Flags = {};
@@ -187,8 +188,14 @@ function flags(args: string[]) {
       rest.push(args[i]);
       continue;
     }
+    const eq = args[i].indexOf("=", 2);
+    if (eq !== -1) {
+      named[args[i].slice(2, eq)] = args[i].slice(eq + 1);
+      continue;
+    }
     const name = args[i].slice(2);
-    if (args[i + 1] !== undefined && !args[i + 1].startsWith("--")) named[name] = args[++i];
+    if (BOOLEAN_FLAGS.has(name)) named[name] = true;
+    else if (args[i + 1] !== undefined && !args[i + 1].startsWith("--")) named[name] = args[++i];
     else named[name] = true;
   }
   return { named, rest };
@@ -208,8 +215,11 @@ function refuseUnknownFlags(args: string[], { flags: known, usage }: { flags: st
     console.log(usage);
     process.exit(0);
   }
-  const unknown = Object.keys(flags(args).named).filter((name) => !known.includes(name));
+  const { named } = flags(args);
+  const unknown = Object.keys(named).filter((name) => !known.includes(name));
   if (unknown.length) fail(`不认识的参数：${unknown.map((name) => `--${name}`).join("、")}\n\n${usage}`);
+  const badBool = Object.entries(named).find(([name, value]) => BOOLEAN_FLAGS.has(name) && value !== true);
+  if (badBool) fail(`--${badBool[0]} 不接参数值\n\n${usage}`);
 }
 
 const client = (key: string, config = readConfig()) => hubClient(config.url, key);
@@ -805,12 +815,11 @@ function runOf(word: string | undefined, usage: string) {
 }
 
 async function why(args: string[]) {
-  const id = runOf(
-    args.find((arg) => !arg.startsWith("--")),
-    "用法：agent-autoloop why <第几轮> [--json]",
-  );
+  const { named, rest } = flags(args);
+  if (rest.length !== 1) return fail(TAKES.why.usage);
+  const id = runOf(rest[0], TAKES.why.usage);
   const facts = await ownerClient().why(id);
-  if (args.includes("--json")) return console.log(JSON.stringify(facts, null, 2));
+  if (named.json !== undefined) return console.log(JSON.stringify(facts, null, 2));
   const { formatWhy } = await import("./why.ts");
   console.log(formatWhy(id, facts));
 }

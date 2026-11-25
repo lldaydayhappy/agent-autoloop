@@ -8,8 +8,8 @@
 | --- | --- | --- |
 | 事件 | `events` 的 `source + key` 去重；`routed/paused/hops` 区分已派、暂停跳过、无人接、超过 8 层未派，记下后不再改；补跑不改事件，接到这条规则的一轮上就算补过 | `kernel/decide.ts` 的 `ingest/recordEvent` 接来源、回执、回答、时钟和手动运行；`replayRule` 补跑暂停跳过的事件 |
 | 事项 | 没有单独状态列；`rule + lane` 对应的轮次、未结卡片、未来复查共同表达进展 | `enqueue/answer/tick/retryLater`；运行中来的事件排下一轮，失败时把同事项的队列合进重试轮次 |
-| 轮次 | `runs.state`: `queued → claimed → done/nothing/cancelled`；`claimed → unknown`；失败从 claimed/unknown 回 queued，`attempts/not_before` 表达等重试 | `claimNext/finish/applyReceipt/retryLater/cancel/stopRun/sweep`。unknown 不是失败，迟到结果照收，后续新活可以继续 |
-| 停止 | `claimed + cancel_at` 表示正在停；进程结束才 cancelled；排队可直接取消 | 本人 `cancel`，worker 停整个进程组后交结果；停止期间收到 failed 也归 cancelled，不能重派 |
+| 轮次 | `runs.state`: `queued → claimed → done/nothing/cancelled`；`claimed → unknown`；失败从 claimed/unknown 回 queued，`attempts/not_before` 表达等重试 | `claimNext/finish/applyReceipt/retryLater/cancel/stopRun/sweep`。unknown 不是失败，迟到结果照收，后续新活可以继续；本人停掉之后就结束了，不再收结果 |
+| 停止 | `claimed + cancel_at` 表示正在停；进程结束才 cancelled；排队和没有回音的（`unknown`）可直接取消 | 本人 `cancel`，worker 停整个进程组后交结果；停止期间收到 failed 也归 cancelled，不能重派。`unknown` 没有在报它的接单程序，等不到谁来确认，本人停掉就是结束，`summary` 写明是本人停掉、此前已没有回音 |
 | 执行归属 | `agent/rules_version/issued/claim` 固定领取归属；`session/resume` 是续接提示 | `assignQueued/settleSession/claimNext/started/finish`。排队用最新规则，领取后保留原 worker 和规则快照；重复 claim 换 token |
 
 `done + open 提问`、`done + 未来复查` 都合法：只结束这一轮。连续失败最多 10 次，终态轮次不能重排。本人要再做用新事件或手动 `run`。已交回的 `last_issued/last_result/last_answer` 保证同 token 同内容重交只确认一次，不同内容返回 409。
@@ -56,7 +56,7 @@
 | reviewed | deliver-review 要求只审查，完成清标签；部分清除失败不能变成全文交付 |
 | returned | delivery=failure，去 deliver/deliver-review；deliver-attended 由交接者领取，三分钟未领才按既有规则转告 |
 | withdrawn | 检查中撤 deliver，关闭 auto-merge，成功结束但未合并发布，明确报告撤回；不等于 live |
-| retrying | 中台 later 的 delivery-retry 保存 head、GitHub/执行错误计数；换 head 清计数，达限退回；不可写结果时保留重交 |
+| retrying | 中台 later 的 delivery-retry 保存 head、GitHub/执行错误计数；换 head 清计数，达限退回；完整检查还在跑时只顺延、不计数；不可写结果时保留重交 |
 
 关闭未合并的 PR 先写 delivery 失败再清标签，避免等待者卡 pending。ask-owner 是独立 Issue 的转告状态，转告成功才清除，不是上线阶段。来源只认可信账号的 `delivery-agent/<PR号>` 状态；PR 正文审查账本与可信状态绑定轮次、head、审查器和正文摘要。免审不是审查通过，填写「处理」不是复审完成；连续两轮挡上线后只认可信账号写的 `delivery-owner/<PR号>`。
 

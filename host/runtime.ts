@@ -57,10 +57,20 @@ const format = digest(
 );
 let current = openView(db, format);
 db.exec(CARD_HASH_INDEX);
-// Only the history reader needs this index. Adding it to an existing projection doesn't require replaying the log.
-db.exec(`CREATE INDEX IF NOT EXISTS projection_run_history
-  ON projections(collection, json_extract(data,'$.rule'), json_extract(data,'$.id'))
-  WHERE collection='runs'`);
+// These indexes serve the host's read queries. SQLite can build them from an existing projection without replaying facts.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS projection_run_history
+    ON projections(collection, json_extract(data,'$.rule'), json_extract(data,'$.id'))
+    WHERE collection='runs';
+  CREATE INDEX IF NOT EXISTS projection_run_counts
+    ON projections(collection, json_extract(data,'$.rule'), json_extract(data,'$.agent'), json_extract(data,'$.state'),
+      json_extract(data,'$.attempts'), json_extract(data,'$.finished_at'), json_extract(data,'$.usage'))
+    WHERE collection='runs';
+  CREATE INDEX IF NOT EXISTS projection_run_spending
+    ON projections(collection, json_extract(data,'$.finished_at'), json_extract(data,'$.claimed_at'),
+      json_extract(data,'$.usage'))
+    WHERE collection='runs';
+`);
 
 export const all = <T>(sql: string, params: SQLInputValue[] = []) =>
   db
