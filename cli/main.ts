@@ -36,6 +36,7 @@ const HELP = `Agent 自动化中台
   agent-autoloop init [--agent claude|codex] [--command '某个命令 {prompt}'] [--port 3350] [--no-service]
                                     在这台电脑上装好：一个人一台电脑就够
   agent-autoloop try                     用你的 Agent 跑一遍完整流程
+  agent-autoloop wakeups [规则] [--limit 条数] [--json]  按触发原因核对历史轮次和用量（默认最近 100 条）
   agent-autoloop why <第几轮> [--json]  查看时间线；--json 输出原始事实
   agent-autoloop conformance <地址> --config <测试凭据文件>
                                     在测试中台上检查协议
@@ -165,6 +166,7 @@ rules.json 里这个定时任务要写 cwd；你答了，中台叫醒它的 Agen
   },
   rules: { flags: [], usage: "用法：agent-autoloop rules explain [文件]" },
   runs: { flags: ["before", "json"], usage: RUNS_USAGE },
+  wakeups: { flags: ["limit", "json"], usage: "用法：agent-autoloop wakeups [规则] [--limit 正整数] [--json]" },
   run: { flags: ["subject", "reason"], usage: "用法：agent-autoloop run <规则> [--subject 对象] [--reason 说明]" },
   service: { flags: [], usage: "用法：agent-autoloop service install|remove" },
   status: { flags: ["json"], usage: STATUS_USAGE },
@@ -401,6 +403,22 @@ async function join(args: string[]) {
   const name = text(named.worker);
   const key = text(named.key);
   if (!url || !name || !key) return fail(TAKES.join.usage);
+  const badAddress = "中台地址要写完整的 http:// 或 https:// 地址，不能带账号、查询参数或片段";
+  let address: URL;
+  try {
+    address = new URL(url);
+  } catch {
+    return fail(badAddress);
+  }
+  if (
+    !["http:", "https:"].includes(address.protocol) ||
+    address.username ||
+    address.password ||
+    address.search ||
+    address.hash
+  ) {
+    return fail(badAddress);
+  }
   // Joining another hub must not silently replace this machine's existing hub, worker or owner keys.
   if (existsSync(CONFIG_FILE)) {
     return fail(`已经配置过了：${CONFIG_FILE}。为防止覆盖现有设置，请先备份并手动修改配置。`);
@@ -507,6 +525,15 @@ async function runs(args: string[]) {
   if (named.json !== undefined) return console.log(JSON.stringify({ runs: found.runs, before: found.more }, null, 2));
   const color = colorFor(process.stdout, process.env);
   console.log(runsText(found, { rule: rest[0], color, columns: process.stdout.columns }));
+}
+
+async function wakeups(args: string[]) {
+  const { named, rest } = flags(args);
+  if (rest.length > 1 || named.limit === true) return fail(TAKES.wakeups.usage);
+  const limit = named.limit === undefined ? 100 : runOf(named.limit, TAKES.wakeups.usage);
+  const { wakeupReport, wakeupText } = await import("./wakeups.ts");
+  const report = await wakeupReport(ownerClient(), rest[0], limit);
+  console.log(named.json ? JSON.stringify(report, null, 2) : wakeupText(report));
 }
 
 async function answer(args: string[]) {
@@ -932,6 +959,7 @@ const commands: Record<string, () => unknown> = {
   status: () => status(flags(args).named),
   why: () => why(args),
   runs: () => runs(args),
+  wakeups: () => wakeups(args),
   conformance: () => checkConformance(args),
   answer: () => answer(args),
   resolve: () => resolve(args),

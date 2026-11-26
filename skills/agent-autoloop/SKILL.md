@@ -256,7 +256,7 @@ Agent 不要在轮次里直接运行 `up` 重启派它来的这个中台：轮�
 
 接插件先在专用测试中台验证：`agent-autoloop conformance <地址> --config <测试凭据文件>`。文件里的 `keys` 分别放来源、接单程序、通道、本人密钥；`eventType` 匹配测试规则，`answerer` 在测试通道的允许名单内。检查会写事件和卡片，不指向正在用的中台。协议类型在 `protocol/schema.json`。
 
-`agent-autoloop runs [规则] [--before <第几轮>]` 列出更早做完的轮次和编号，`agent-autoloop why 42` 查一轮的事件、规则和回执；`GET /v1/stream?after=42` 供本人客户端按序号续读。备份用 `agent-autoloop backup [目录]`，中台运行时也能做；恢复用 `agent-autoloop restore <目录>`，要先停中台。手工备份要一起保留 `hub.db` 和权限为 0600 的 `master.key`；后者推导轮次和卡片链接的 token。
+`agent-autoloop runs [规则] [--before <第几轮>]` 列出更早做完的轮次和编号，`agent-autoloop why 42` 查一轮的事件、规则和回执；`agent-autoloop wakeups [规则]` 按叫醒原因（到期复查、人工回答、别的事件）汇总最近的轮次和用量，看哪条规则在反复复查；`GET /v1/stream?after=42` 供本人客户端按序号续读。备份用 `agent-autoloop backup [目录]`，中台运行时也能做；恢复用 `agent-autoloop restore <目录>`，要先停中台。手工备份要一起保留 `hub.db` 和权限为 0600 的 `master.key`；后者推导轮次和卡片链接的 token。
 
 ## 版本与卸载
 
