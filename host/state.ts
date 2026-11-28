@@ -176,12 +176,6 @@ export function stateOf(now: number, before: number | undefined, rules: Rules, {
   };
   const counts = all<Row>(COUNTS, [iso(dayStart(now, rules.timezone))]);
   const openCards = all<Row>("SELECT * FROM cards WHERE state = 'open' ORDER BY id DESC");
-  const lastDeliveries = new Map(
-    all<Row>(
-      "SELECT channel, card_id, tries, error, given_up FROM deliveries " +
-        "WHERE (channel, card_id) IN (SELECT channel, MAX(card_id) FROM deliveries GROUP BY channel)",
-    ).map((row) => [row.channel as string, row]),
-  );
   const recentCards = all<Row>("SELECT * FROM cards WHERE state <> 'open' ORDER BY id DESC LIMIT 20");
   const timers = before
     ? []
@@ -262,7 +256,10 @@ export function stateOf(now: number, before: number | undefined, rules: Rules, {
     }),
     channels: Object.entries(rules.channels).map(([id, { name }]) => {
       // Coming back says the channel's program runs, not that a card got through: the last one it was given says that.
-      const last = lastDeliveries.get(id);
+      const [last] = all<Row>(
+        "SELECT card_id, tries, error, given_up FROM deliveries WHERE channel = ? ORDER BY card_id DESC LIMIT 1",
+        [id],
+      );
       const lastFailure = last?.error
         ? {
             card: last.card_id as number,

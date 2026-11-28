@@ -633,10 +633,10 @@ async function runNow(args: string[]) {
 }
 
 async function doctor() {
-  let bad = 0;
+  // Set as each failure is printed, not once at the end: the run stops early when there's no config yet.
   const say = (ok: boolean, words: string) => {
     console.log(`${ok ? "●" : "○"} ${words}`);
-    if (!ok) bad += 1;
+    if (!ok) process.exitCode = 1;
   };
   say(Number(process.versions.node.split(".")[0]) >= 24, `Node ${process.versions.node}`);
   if (!existsSync(CONFIG_FILE)) return say(false, "还没装好：运行 agent-autoloop init");
@@ -699,7 +699,6 @@ async function doctor() {
       say(false, `读不到中台状态：${(error as Error).message}`);
     }
   }
-  if (bad) process.exit(1);
 }
 
 /** Only reads the file: checking a draft must not open the hub's database or load the draft into it. */

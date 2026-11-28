@@ -43,6 +43,7 @@ test("wire schemas agree with event and receipt boundaries", () => {
     { id: 7, type: "invalid" },
     { id: "one", type: "bad type" },
     { id: "one", type: "app.changed", subject: "有中文" },
+    { id: "one", type: "app.changed", link: "https://x.test/中文" },
   ]) {
     let accepted = true;
     try {

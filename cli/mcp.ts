@@ -3,11 +3,13 @@ import { readConfig } from "../host/config.ts";
 import { eachLine } from "../host/lines.ts";
 import { versionName } from "../host/version.ts";
 import { hubClient, type Hub } from "../protocol/client.ts";
+import { readRuns } from "./runs.ts";
 
 const positive = { type: "integer", minimum: 1 };
 const string = { type: "string", minLength: 1 };
 const specs = [
   ["status", "查看现在的事项和卡片；before 写上一页的 nextBefore，往前翻更早的轮次", { before: positive }, []],
+  ["runs", "列出已结束的轮次；可按 rule 只看一条规则，before 写上一页的游标", { rule: string, before: positive }, []],
   ["why", "查看一轮的事件、规则和结果", { run: positive }, ["run"]],
   [
     "answer",
@@ -49,7 +51,7 @@ function toolsFor(config: ReturnType<typeof readConfig>) {
       name,
       description,
       inputSchema: { type: "object", properties, required, additionalProperties: false },
-      annotations: { readOnlyHint: ["status", "why"].includes(name), destructiveHint: name === "stop" },
+      annotations: { readOnlyHint: ["status", "runs", "why"].includes(name), destructiveHint: name === "stop" },
     }));
 }
 type Tool = ReturnType<typeof toolsFor>[number];
@@ -72,6 +74,8 @@ function callTool(hub: Hub, name: Tool["name"], args: any) {
   switch (name) {
     case "status":
       return hub.state(args.before);
+    case "runs":
+      return readRuns(hub, args.rule, args.before).then(({ runs, more }) => ({ runs, before: more }));
     case "why":
       return hub.why(args.run);
     case "answer": {

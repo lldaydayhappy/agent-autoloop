@@ -3,7 +3,8 @@
 // a client is told a version number left behind by a release; a slow tool call holds up a ping or another call, or is
 // dropped when the input ends while it's in hand; a U+2028 or U+2029 in a request, which JSON leaves as it is, cuts the
 // line, so the request never gets an answer. An Agent asking through MCP sees only the newest page of runs and can't go
-// back past it.
+// back past it, can't list the finished runs of a single rule, or can't fall back to paging the state when no rule is
+// given.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -53,7 +54,9 @@ async function connect(hub: RequestListener) {
     }
   };
   const close = async () => {
+    child.stdin.end();
     child.kill();
+    await closed.catch(() => {});
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   };
@@ -131,7 +134,7 @@ test("MCP stdio initializes and exposes only the typed hub operations", async ()
   );
   const get = (id: number) => responses.find((r) => r.id === id);
   assert.equal(get(1).result.protocolVersion, "2025-11-25");
-  for (const name of ["answer", "pause", "resume", "run", "replay"])
+  for (const name of ["answer", "pause", "resume", "run", "replay", "runs"])
     assert.ok(get(2).result.tools.some((t: any) => t.name === name));
   assert.equal(get(3).result.isError, undefined);
   assert.equal(get(4).error.code, -32602);
@@ -149,16 +152,36 @@ test("MCP stdio initializes and exposes only the typed hub operations", async ()
   ]);
 });
 
-test("status goes back a page of runs when given before", async () => {
+test("status goes back a page of runs when given before; runs lists finished runs by rule, or pages state", async () => {
+  const finished = { id: 40, rule: "巡检", state: "done" };
   const urls: string[] = [];
   const mcp = await connect((req, res) => {
     urls.push(req.url!);
-    res.end(JSON.stringify({ ok: true }));
+    res.end(
+      JSON.stringify({
+        now: "2026-11-10T02:00:00.000Z",
+        timezone: "Asia/Shanghai",
+        runs: [finished],
+        hasMore: false,
+        nextBefore: null,
+      }),
+    );
   });
-  mcp.send({ id: 2, method: "tools/call", params: { name: "status", arguments: { before: 41 } } });
-  assert.equal((await mcp.answered(2)).result.isError, undefined);
-  await mcp.close();
-  assert.deepEqual(urls, ["/v1/state?before=41"]);
+  try {
+    mcp.send({ id: 2, method: "tools/call", params: { name: "status", arguments: { before: 41 } } });
+    assert.equal((await mcp.answered(2)).result.isError, undefined);
+    mcp.send({ id: 3, method: "tools/call", params: { name: "runs", arguments: { rule: "巡检", before: 41 } } });
+    const byRule = (await mcp.answered(3)).result;
+    assert.equal(byRule.isError, undefined);
+    assert.deepEqual(JSON.parse(byRule.content[0].text), { runs: [finished], before: null });
+    mcp.send({ id: 4, method: "tools/call", params: { name: "runs", arguments: {} } });
+    const paged = (await mcp.answered(4)).result;
+    assert.equal(paged.isError, undefined);
+    assert.deepEqual(JSON.parse(paged.content[0].text), { runs: [finished], before: null });
+    assert.deepEqual(urls, ["/v1/state?before=41", "/v1/runs?rule=%E5%B7%A1%E6%A3%80&before=41", "/v1/state"]);
+  } finally {
+    await mcp.close();
+  }
 });
 
 test("U+2028 and U+2029 in a request are part of the line", async () => {

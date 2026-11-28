@@ -63,10 +63,17 @@ function taskProcess(level: "Highest" | "Limited") {
 }
 
 // Making a task that runs at the highest level takes an elevated administrator and a signed-in desktop, as on the test
-// machine and not on CI.
+// machine and not on CI. A session that isn't elevated can't register one at all — Windows answers "Access is denied" —
+// so the test stands down there instead of failing the suite over an account's rights: what it checks is `aboveDesktop`.
+const canRunHighest =
+  windows &&
+  !process.env.CI &&
+  powershell(
+    `([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)`,
+  ) === "True";
 test(
   "a process with more rights than the desktop is told apart from one with the desktop's own",
-  { skip: !windows || !!process.env.CI },
+  { skip: !canRunHighest && "registering a task at the highest level takes an elevated administrator" },
   async () => {
     const { aboveDesktop } = await import("../host/service.ts");
     const higher = taskProcess("Highest");

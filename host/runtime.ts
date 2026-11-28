@@ -66,6 +66,9 @@ db.exec(`
     ON projections(collection, json_extract(data,'$.rule'), json_extract(data,'$.agent'), json_extract(data,'$.state'),
       json_extract(data,'$.attempts'), json_extract(data,'$.finished_at'), json_extract(data,'$.usage'))
     WHERE collection='runs';
+  CREATE INDEX IF NOT EXISTS projection_delivery_latest
+    ON projections(collection, json_extract(data,'$.channel'), json_extract(data,'$.card_id'))
+    WHERE collection='deliveries';
   CREATE INDEX IF NOT EXISTS projection_run_spending
     ON projections(collection, json_extract(data,'$.finished_at'), json_extract(data,'$.claimed_at'),
       json_extract(data,'$.usage'))

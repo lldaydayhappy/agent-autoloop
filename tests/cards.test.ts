@@ -18,6 +18,7 @@
 // A card closed while its first message is on the way never gets that message updated.
 // After a rule moves to another group, its next run isn't given the cards its earlier runs left open (issue #362).
 // A channel whose program keeps coming but whose last card didn't get through looks fine in the state (issue #290).
+// An older failed delivery still looks like the latest failure after a newer card gets through.
 // A rule that lists its channels has its cards, and the notices of its runs, sent to others as well; one that lists none
 // stops reaching every channel; a notice of nobody's rule reaches only some. With defaultChannels, a card that names no
 // channels of its own (a tell, the hub's own alert, a task elsewhere asking, a rule without a list) still reaches every
@@ -542,6 +543,20 @@ test("the state says when a channel's last card didn't get through, and stops sa
   assert.equal(stateOf(at(0)).channels.find((channel) => channel.id === "plain")!.lastFailure, undefined);
   delivered("chat", id, nextCard("chat", at(1))!.version, "om_1", at(1));
   assert.equal(chat(at(1)).lastFailure, undefined);
+});
+
+test("a newer delivered card hides an older card's delivery error in the state", () => {
+  clean();
+  const now = at(0);
+  const older = tell("source:app:older", "应用", "上期周报", now).card;
+  failed("chat", older, nextCard("chat", now)!.version, "session not ready", now);
+  assert.equal(stateOf(now).channels.find((channel) => channel.id === "chat")!.lastFailure?.card, older);
+
+  const newest = tell("source:app:newest", "应用", "本期周报", now).card;
+  const sent = nextCard("chat", now)!;
+  assert.equal(sent.id, newest);
+  delivered("chat", newest, sent.version, "om_newest", now);
+  assert.equal(stateOf(now).channels.find((channel) => channel.id === "chat")!.lastFailure, undefined);
 });
 
 test("a failed send is retried further and further apart, then given up within the hour; a channel that never came hasn't failed", () => {
